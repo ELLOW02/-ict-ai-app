@@ -64,51 +64,65 @@ function sparkTrend(d) {
 
 /** Step 1: Fetch live price using Claude + web_search */
 async function fetchPriceViaAI(pair) {
-  const body = {
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 200,
-    tools: [{ type: "web_search_20250305", name: "web_search" }],
-    system: `You are a data extraction assistant. When asked for a current forex/index price, search the web and return ONLY a JSON object with this exact format: {"price": <number>, "source": "<site name>"}. No markdown, no extra text.`,
-    messages: [{
-      role: "user",
-      content: `Search for the current live price of ${pair} right now. Return only JSON: {"price": <number>, "source": "<site>"}`
-    }],
-  };
-
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-
-  // Find the final text block (after tool use)
-  const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
-  if (!textBlock) return null;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000); // 20s max
 
   try {
-    const clean = textBlock.text.replace(/```json|```/g, "").trim();
-    // Extract JSON object even if there's surrounding text
-    const match = clean.match(/\{[\s\S]*"price"[\s\S]*\}/);
-    if (!match) return null;
-    const obj = JSON.parse(match[0]);
-    if (typeof obj.price === "number" && obj.price > 0) return obj;
+    const body = {
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 200,
+      tools: [{ type: "web_search_20250305", name: "web_search" }],
+      system: `You are a data extraction assistant. When asked for a current forex/index price, search the web and return ONLY a JSON object with this exact format: {"price": <number>, "source": "<site name>"}. No markdown, no extra text.`,
+      messages: [{
+        role: "user",
+        content: `Search for the current live price of ${pair} right now. Return only JSON: {"price": <number>, "source": "<site>"}`
+      }],
+    };
+
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+
+    // Find the final text block (after tool use)
+    const textBlock = [...(data.content || [])].reverse().find(b => b.type === "text");
+    if (!textBlock) return null;
+
+    try {
+      const clean = textBlock.text.replace(/```json|```/g, "").trim();
+      // Extract JSON object even if there's surrounding text
+      const match = clean.match(/\{[\s\S]*"price"[\s\S]*\}/);
+      if (!match) return null;
+      const obj = JSON.parse(match[0]);
+      if (typeof obj.price === "number" && obj.price > 0) return obj;
+      return null;
+    } catch { return null; }
+  } catch {
+    // AbortError (timeout) or network error
     return null;
-  } catch { return null; }
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 /** Step 2: Full ICT analysis with the real price */
 async function callClaudeICT({ pair, timeframe, session, price, priceSource }) {
   const meta = PAIR_META[pair] || { decimals: 5, pip: 0.0001 };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 30000); // 30s max
 
-  const system = `You are ICT-AI, an expert Inner Circle Trader analyst created by Ion Lozan. You perform intraday analysis using pure ICT methodology: liquidity sweeps (BSL/SSL), Order Blocks (OB), Fair Value Gaps (FVG), Market Structure Shifts (MSS), Break of Structure (BOS), Premium/Discount arrays, Killzones, Judas Swing, IPDA, OTE.
+  try {
+    const system = `You are ICT-AI, an expert Inner Circle Trader analyst created by Ion Lozan. You perform intraday analysis using pure ICT methodology: liquidity sweeps (BSL/SSL), Order Blocks (OB), Fair Value Gaps (FVG), Market Structure Shifts (MSS), Break of Structure (BOS), Premium/Discount arrays, Killzones, Judas Swing, IPDA, OTE.
 
 IMPORTANT: All price levels you output MUST be mathematically derived from the actual current price provided. Do not invent levels — calculate realistic ICT zones based on the real price.
 
 Respond ONLY with a valid JSON object. No markdown, no backticks, no preamble.
 {"bias":"BULLISH"|"BEARISH"|"NEUTRAL"|"RANGING","confidence":<0-100>,"session_quality":"HIGH"|"MEDIUM"|"LOW","key_concept":<string>,"summary":<2-3 sentence ICT analysis>,"entry_zone":<price range string>,"sl_zone":<string with price + reason>,"tp1":<price string>,"tp2":<price string>,"risk_reward":<"1:X.X">,"structure":"UPTREND"|"DOWNTREND"|"CONSOLIDATION","liquidity_target":<string>,"ob_level":<string>,"fvg":<string>,"ict_pattern":<string>,"killzone":"ACTIVE"|"APPROACHING"|"CLOSED","warning":<string|null>}`;
 
-  const user = `Analyze ${pair} on ${timeframe} timeframe.
+    const user = `Analyze ${pair} on ${timeframe} timeframe.
 Current REAL market price: ${price} (fetched from: ${priceSource})
 Pip size: ${meta.pip} | Decimals: ${meta.decimals}
 Active session: ${session || "Off-session"}
@@ -116,20 +130,26 @@ UTC time: ${new Date().toUTCString()}
 
 Calculate all ICT levels (OB, FVG, SL, TP1, TP2, liquidity) as actual price numbers derived mathematically from ${price}.`;
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      system,
-      messages: [{ role: "user", content: user }],
-    }),
-  });
-  const data = await res.json();
-  const raw = data.content?.find(b => b.type === "text")?.text || "{}";
-  try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
-  catch { return null; }
+    const res = await fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: "claude-sonnet-4-20250514",
+        max_tokens: 1000,
+        system,
+        messages: [{ role: "user", content: user }],
+      }),
+      signal: controller.signal,
+    });
+    const data = await res.json();
+    const raw = data.content?.find(b => b.type === "text")?.text || "{}";
+    try { return JSON.parse(raw.replace(/```json|```/g, "").trim()); }
+    catch { return null; }
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 // ─── UI COMPONENTS ────────────────────────────────────────────────────────────
@@ -198,6 +218,11 @@ export default function ICTAnalyzer() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const autoRef = useRef(null);
   const meta = PAIR_META[pair] || { decimals: 5, pip: 0.0001 };
+
+  // ── Hide splash screen once app mounts ──
+  useEffect(() => {
+    if (window.__hideSplash) window.__hideSplash();
+  }, []);
 
   // ── Fetch price ──
   const loadPrice = useCallback(async (p = pair, silent = false) => {
