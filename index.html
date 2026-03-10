@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+
+  <!-- PWA Meta -->
+  <title>ICT-AI by Ion Lozan</title>
+  <meta name="description" content="Análisis ICT intraday con IA — by Ion Lozan"/>
+  <link rel="manifest" href="/manifest.json"/>
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="ICT-AI"/>
+  <link rel="apple-touch-icon" href="/icons/icon-180x180.png"/>
+  <link rel="apple-touch-icon" sizes="152x152" href="/icons/icon-152x152.png"/>
+  <link rel="apple-touch-icon" sizes="120x120" href="/icons/icon-120x120.png"/>
+  <link rel="apple-touch-icon" sizes="76x76"   href="/icons/icon-76x76.png"/>
+
+  <!-- Theme -->
+  <meta name="theme-color" content="#040911"/>
+  <meta name="msapplication-TileColor" content="#040911"/>
+
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body, #root {
+      height: 100%;
+      background: #040911;
+      /* Safe area for iPhone notch */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    /* Splash screen while React loads */
+    #splash {
+      position: fixed; inset: 0;
+      background: #040911;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      z-index: 9999; transition: opacity .5s ease;
+    }
+    #splash.hide { opacity: 0; pointer-events: none; }
+    .splash-icon {
+      width: 80px; height: 80px; border-radius: 20px;
+      background: linear-gradient(135deg, #0ea5e9, #6366f1);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px; margin-bottom: 20px;
+      box-shadow: 0 0 40px #0ea5e950;
+      animation: pulse 2s ease-in-out infinite;
+    }
+    .splash-title {
+      font-family: 'Courier New', monospace;
+      font-size: 22px; font-weight: 900;
+      color: #0ea5e9; letter-spacing: 4px;
+    }
+    .splash-sub {
+      font-family: 'Courier New', monospace;
+      font-size: 9px; color: #1e3a5f;
+      letter-spacing: 4px; margin-top: 6px;
+    }
+    .splash-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: #0ea5e9; margin-top: 30px;
+      animation: blink 1s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100%{box-shadow:0 0 30px #0ea5e940} 50%{box-shadow:0 0 60px #0ea5e970} }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.1} }
+  </style>
+</head>
+<body>
+
+  <!-- Splash screen -->
+  <div id="splash">
+    <div class="splash-icon">⬡</div>
+    <div class="splash-title">ICT-AI</div>
+    <div class="splash-sub">BY ION LOZAN</div>
+    <div class="splash-dot"></div>
+  </div>
+
+  <div id="root"></div>
+
+  <!-- React + Babel via CDN -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Load the ICT-AI app component -->
+  <script type="text/babel" data-type="module" src="/app.jsx"></script>
+
+  <!-- Register Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js')
+          .then(reg => console.log('SW registered:', reg.scope))
+          .catch(err => console.log('SW error:', err));
+      });
+    }
+    // Hide splash when app mounts
+    window.__hideSplash = function() {
+      const s = document.getElementById('splash');
+      if (s) { s.classList.add('hide'); setTimeout(() => s.remove(), 600); }
+    };
+  </script>
+
+</body>
+</html>
