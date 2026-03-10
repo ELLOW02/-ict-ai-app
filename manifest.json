@@ -1,0 +1,19 @@
+{
+  "name": "ICT-AI by Ion Lozan",
+  "short_name": "ICT-AI",
+  "description": "Análisis ICT intraday con IA — by Ion Lozan",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#040911",
+  "theme_color": "#040911",
+  "categories": ["finance", "utilities"],
+  "icons": [
+    { "src": "/icons/icon-76x76.png",   "sizes": "76x76",   "type": "image/png" },
+    { "src": "/icons/icon-120x120.png", "sizes": "120x120", "type": "image/png" },
+    { "src": "/icons/icon-152x152.png", "sizes": "152x152", "type": "image/png" },
+    { "src": "/icons/icon-180x180.png", "sizes": "180x180", "type": "image/png", "purpose": "apple-touch-icon" },
+    { "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
